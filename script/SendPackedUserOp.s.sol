@@ -4,22 +4,46 @@ pragma solidity ^0.8.24;
 import {Script} from "forge-std/Script.sol";
 import {MinimalAccountEthereum} from "../src/ethereum/MinimalAccountEthereum.sol";
 import {PackedUserOperation} from "lib/account-abstraction/contracts/interfaces/PackedUserOperation.sol";
+import {HelperConfig} from "script/HelperConfig.s.sol";
+import {IEntryPoint} from "lib/account-abstraction/contracts/interfaces/IEntryPoint.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 contract SendPackedUserOp is Script {
+    using MessageHashUtils for bytes32;
+
     function run() public {}
 
-    function generatedSignedUserOperation(bytes memory callData, address sender)
+    function generatedSignedUserOperation(bytes memory callData, HelperConfig.NetworkConfig memory config)
         public
+        view
         returns (PackedUserOperation memory)
     {
         // 1. generate the unsigned data
-        uint256 nonce = vm.getNonce(sender);
-        PackedUserOperation memory unsignedUserOp = _generateUnsignedUserOperation(callData, sender, nonce);
-        // 2. sign, return it
+        uint256 nonce = vm.getNonce(config.account);
+        PackedUserOperation memory userOp = _generateUnsignedUserOperation(callData, config.account, nonce);
+        // 2. get user op hash
+
+        bytes32 userOpHash = IEntryPoint(config.entryPoint).getUserOpHash(userOp);
+        bytes32 digest = userOpHash.toEthSignedMessageHash();
+
+        // 3. sign, return it
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        uint256 ANVIL_DEFAULT_KEY = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
+        if (block.chainid == 31337) {
+            (v, r, s) = vm.sign(ANVIL_DEFAULT_KEY, digest);
+        } else {
+            (v, r, s) = vm.sign(config.account, digest); // vm.sign (privateKey, digest) - in this case foundry looks up the account (public key) and if it has the associated private key, uses it here.
+        }
+
+        userOp.signature = abi.encodePacked(r, s, v);
+        return userOp;
     }
 
     function _generateUnsignedUserOperation(bytes memory callData, address sender, uint256 nonce)
         internal
+        pure
         returns (PackedUserOperation memory)
     {
         // This will return a PackedUserOperation, but with no signature yet.

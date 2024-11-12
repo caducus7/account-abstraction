@@ -16,7 +16,7 @@ contract DeployMinimalEth is Script {
 
         vm.startBroadcast(config.account);
         MinimalAccountEthereum minimalAccount = new MinimalAccountEthereum(config.entryPoint);
-        minimalAccount.transferOwnership(msg.sender);
+        minimalAccount.transferOwnership(config.account);
 
         vm.stopBroadcast();
         return (helperConfig, minimalAccount);
