@@ -19,7 +19,7 @@ contract SendPackedUserOp is Script {
         address minimalAccount
     ) public view returns (PackedUserOperation memory) {
         // 1. generate the unsigned data
-        uint256 nonce = vm.getNonce(minimalAccount);
+        uint256 nonce = vm.getNonce(minimalAccount) - 1;
         PackedUserOperation memory userOp = _generateUnsignedUserOperation(callData, minimalAccount, nonce);
         // 2. get user op hash
 
